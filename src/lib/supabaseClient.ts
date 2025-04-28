@@ -1,29 +1,21 @@
-import { createClient } from '@supabase/supabase-js';
-
-export const supabase = createClient('https://gvcydeyeunqgpsdgibxp.supabase.co', 
-    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd2Y3lkZXlldW5xZ3BzZGdpYnhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDU3NzgyNDQsImV4cCI6MjA2MTM1NDI0NH0.2wxK_SQkO-dw7GxKsvvFDcy4E5Js-2GEaMRWyk-ICZ4');
-
 // src/pages/patient/Requests.tsx
+
 import React, { useEffect, useState } from 'react';
+import { supabase } from '@/lib/supabaseClient';
+import { useAuth } from '@/contexts/AuthContext';
+import { toast } from 'sonner';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, Send, Clock, FileQuestion } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { useAuth } from '@/contexts/AuthContext';
-import { toast } from 'sonner';
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
-  DialogFooter, DialogDescription
-} from '@/components/ui/dialog';
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue
-} from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { supabase } from '@/lib/supabaseClient';
+import { Search, Send, Clock, FileQuestion } from 'lucide-react';
+
 
 interface Request {
   id: string;
@@ -34,7 +26,7 @@ interface Request {
   status: string;
 }
 
-const PatientRequests: React.FC = () => {
+export default function PatientRequests() {
   const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [showDialog, setShowDialog] = useState(false);
@@ -46,7 +38,7 @@ const PatientRequests: React.FC = () => {
   if (!user) return null;
   const patientId = user.id;
 
-  // 1️⃣ Fetch doctors once
+  // Fetch doctors
   useEffect(() => {
     supabase
       .from('users')
@@ -58,31 +50,31 @@ const PatientRequests: React.FC = () => {
       });
   }, []);
 
-  // 2️⃣ Fetch patient requests once and subscribe
+  // Fetch and subscribe to requests
   useEffect(() => {
-    let channel: any;
-    async function load() {
+    async function fetchRequests() {
       const { data, error } = await supabase
-        .from<Request>('requests')
+        .from('requests')
         .select('*')
         .eq('patient_id', patientId)
         .order('created_at', { ascending: false });
       if (!error) setRequests(data || []);
     }
-    load();
+    fetchRequests();
 
-    // Realtime subscription
-    channel = supabase
+    const channel = supabase
       .channel('public:requests')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'requests' }, payload => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'requests' }, (payload) => {
         const req = payload.new as Request;
         if (req.patient_id === patientId) {
-          setRequests(r => [req, ...r]);
+          setRequests(prev => [req, ...prev]);
         }
       })
       .subscribe();
 
-    return () => supabase.removeChannel(channel);
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [patientId]);
 
   const handleSend = async () => {
@@ -95,23 +87,23 @@ const PatientRequests: React.FC = () => {
       message,
       status: 'Pending'
     });
+
     if (error) toast.error('Failed to send request');
     else {
-      toast.success('Request sent');
+      toast.success('Request sent successfully');
       setShowDialog(false);
       setSelectedDoctor('');
       setMessage('');
     }
   };
 
-  // Filter by doctor name or message
-  const filtered = requests.filter(r => {
-    const doc = doctors.find(d => d.id === r.doctor_id);
-    const name = doc?.name.toLowerCase() || '';
+  const filteredRequests = requests.filter(req => {
+    const doctor = doctors.find(d => d.id === req.doctor_id);
+    const doctorName = doctor?.name.toLowerCase() || '';
     return (
-      name.includes(searchTerm.toLowerCase()) ||
-      r.message.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      r.status.toLowerCase().includes(searchTerm.toLowerCase())
+      doctorName.includes(searchTerm.toLowerCase()) ||
+      req.message.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      req.status.toLowerCase().includes(searchTerm.toLowerCase())
     );
   });
 
@@ -129,7 +121,7 @@ const PatientRequests: React.FC = () => {
           <Search className="absolute left-2 top-2 h-4 w-4 text-muted-foreground" />
           <Input
             className="pl-8"
-            placeholder="Search…"
+            placeholder="Search..."
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
           />
@@ -149,11 +141,11 @@ const PatientRequests: React.FC = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.length > 0 ? filtered.map(req => {
-                const doc = doctors.find(d => d.id === req.doctor_id);
+              {filteredRequests.length > 0 ? filteredRequests.map(req => {
+                const doctor = doctors.find(d => d.id === req.doctor_id);
                 return (
                   <TableRow key={req.id}>
-                    <TableCell>{doc?.name}</TableCell>
+                    <TableCell>{doctor?.name}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
                         <Clock className="h-4 w-4 text-muted-foreground" />
@@ -178,20 +170,23 @@ const PatientRequests: React.FC = () => {
         </CardContent>
       </Card>
 
+      {/* Dialog to send new request */}
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>New Access Request</DialogTitle>
-            <DialogDescription>Choose a doctor and enter your reason.</DialogDescription>
+            <DialogDescription>Select a doctor and send a request</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium">Doctor</label>
+              <label className="block text-sm font-medium">Select Doctor</label>
               <Select value={selectedDoctor} onValueChange={setSelectedDoctor}>
-                <SelectTrigger className="w-full"/>
+                <SelectTrigger className="w-full" />
                 <SelectContent>
-                  {doctors.map(d => (
-                    <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                  {doctors.map(doc => (
+                    <SelectItem key={doc.id} value={doc.id}>
+                      {doc.name}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -214,6 +209,4 @@ const PatientRequests: React.FC = () => {
       </Dialog>
     </div>
   );
-};
-
-export default PatientRequests;
+}
