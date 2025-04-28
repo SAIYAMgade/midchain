@@ -1,4 +1,3 @@
-
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { User, findUserByEmail } from '@/lib/mockData';
 
@@ -32,9 +31,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const login = async (email: string, password: string) => {
-    // In a real app, this would be an API call
     const foundUser = findUserByEmail(email);
-    
     if (foundUser && foundUser.password === password) {
       const { password: _, ...userWithoutPassword } = foundUser;
       setUser(userWithoutPassword);
@@ -50,12 +47,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ 
-      user, 
-      loading, 
-      login, 
+    <AuthContext.Provider value={{
+      user,
+      loading,
+      login,
       logout,
-      isAuthenticated: !!user
+      isAuthenticated: !!user,
     }}>
       {children}
     </AuthContext.Provider>
