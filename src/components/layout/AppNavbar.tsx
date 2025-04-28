@@ -27,9 +27,9 @@ const AppNavbar: React.FC = () => {
 
     try {
       await ethereum.request({ method: 'eth_requestAccounts' });
-      const provider = new ethers.providers.Web3Provider(ethereum);
-      const signer = provider.getSigner();
-      const address = await signer.getAddress();
+      const provider = new ethers.BrowserProvider(window.ethereum as any);
+      const signer = await provider.getSigner();
+     const address = await signer.getAddress();
       setWalletAddress(address);
     } catch (err) {
       console.error('Wallet connection error:', err);
