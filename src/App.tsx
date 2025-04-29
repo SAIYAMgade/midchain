@@ -50,6 +50,9 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 // Test page
 import TestPage from '@/pages/patient/Test';
 
+// ⭐️ Blockchain Demo Page
+import StoreDataPage from '@/pages/StoreDataPage';
+
 const queryClient = new QueryClient();
 
 const App: React.FC = () => (
@@ -91,7 +94,10 @@ const App: React.FC = () => (
               <Route path="/profile" element={<AppLayout><ProfileRedirect /></AppLayout>} />
 
               {/* Test Route */}
-              <Route path="/test" element={<TestPage />} />
+              <Route path="/test" element={<AppLayout><TestPage /></AppLayout>} />
+
+              {/* ⭐️ Blockchain Store & Fetch Data Route */}
+              <Route path="/store" element={<AppLayout><StoreDataPage /></AppLayout>} />
 
               {/* Catch-all */}
               <Route path="*" element={<NotFound />} />
