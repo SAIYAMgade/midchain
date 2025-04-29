@@ -1,3 +1,4 @@
+import { storeMedicalRecord } from "@/lib/mockData";
 
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,6 +14,8 @@ import {
 } from '@/lib/mockData';
 import { useAuth } from '@/contexts/AuthContext';
 import { Link } from 'react-router-dom';
+
+
 
 const PatientDashboard: React.FC = () => {
   const { user } = useAuth();

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
-import PatientSendRequest from '@/components/PatientSendRequest';
+import PatientSendRequest from '@/components/PatientSendRequest';import { storeMedicalRecord } from "@/lib/mockData";
+
 
 export default function RequestDoctorPage() {
   const [doctors, setDoctors] = useState<any[]>([]);

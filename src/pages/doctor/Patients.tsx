@@ -1,6 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { storeMedicalRecord } from "@/lib/mockData";
+
 import {
   Table,
   TableBody,
@@ -24,8 +26,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 
-// Type for patient structure
-type PatientType = {
+export type PatientType = {
   id: string;
   name: string;
   email: string;
@@ -35,63 +36,39 @@ type PatientType = {
 const DoctorPatients: React.FC = () => {
   const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
+  const [patients, setPatients] = useState<PatientType[]>([]);
+  const [selectedPatient, setSelectedPatient] = useState<PatientType | null>(null);
   const [showPatientDialog, setShowPatientDialog] = useState(false);
   const [showUploadDialog, setShowUploadDialog] = useState(false);
-  const [selectedPatient, setSelectedPatient] = useState<PatientType | null>(
-    null
-  );
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [isUploading, setIsUploading] = useState(false);
+  const [showAddPatientDialog, setShowAddPatientDialog] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [fileTags, setFileTags] = useState("");
-
-  // Add Patient Dialog state
-  const [showAddPatientDialog, setShowAddPatientDialog] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [isUploading, setIsUploading] = useState(false);
   const [newPatientName, setNewPatientName] = useState("");
   const [newPatientEmail, setNewPatientEmail] = useState("");
   const [newPatientWallet, setNewPatientWallet] = useState("");
+  
+  useEffect(() => {
+    if (user) {
+      const fetchedPatients = getDoctorPatients(user.id);
+      setPatients(fetchedPatients);
+    }
+  }, [user]);
 
   if (!user) return null;
 
-  // Fetch mock patients
-  const patients = getDoctorPatients(user.id);
+  const truncateWallet = (wallet: string) => `${wallet.slice(0, 4)}...${wallet.slice(-4)}`;
 
-  // Search filtering
-  const filteredPatients = patients.filter((patient) =>
-    `${patient.name} ${patient.email} ${patient.wallet}`
-      .toLowerCase()
-      .includes(searchTerm.toLowerCase())
-  );
-
-  const truncateWallet = (wallet: string) =>
-    `${wallet.slice(0, 4)}...${wallet.slice(-4)}`;
-
-  const getPatientRecordCount = (patientId: string) =>
-    getUserMedicalRecords(patientId).length;
+  const getPatientRecordCount = (patientId: string) => getUserMedicalRecords(patientId).length;
 
   const getLastUploadDate = (patientId: string) => {
     const records = getUserMedicalRecords(patientId);
     if (records.length === 0) return "No records";
     const sortedRecords = [...records].sort(
-      (a, b) =>
-        new Date(b.uploadDate).getTime() - new Date(a.uploadDate).getTime()
+      (a, b) => new Date(b.uploadDate).getTime() - new Date(a.uploadDate).getTime()
     );
     return new Date(sortedRecords[0].uploadDate).toLocaleDateString();
-  };
-
-  // Action handlers
-  const handleViewPatient = (patient: PatientType) => {
-    setSelectedPatient(patient);
-    setShowPatientDialog(true);
-  };
-
-  const handleShowUploadDialog = (patient: PatientType) => {
-    setSelectedPatient(patient);
-    setShowUploadDialog(true);
-  };
-
-  const handleAddPatient = () => {
-    setShowAddPatientDialog(true);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -105,19 +82,30 @@ const DoctorPatients: React.FC = () => {
       toast.error("Please select a file to upload");
       return;
     }
+
     setIsUploading(true);
-    const progressInterval = setInterval(() => {
+    const interval = setInterval(() => {
       setUploadProgress((prev) => {
         if (prev >= 100) {
-          clearInterval(progressInterval);
+          clearInterval(interval);
           setIsUploading(false);
-          toast.success(
-            `File ${selectedFile.name} uploaded successfully for ${selectedPatient?.name}`
-          );
-          setShowUploadDialog(false);
+          toast.success(`File uploaded successfully for ${selectedPatient?.name}`);
           setSelectedFile(null);
           setFileTags("");
+          setShowUploadDialog(false);
           setUploadProgress(0);
+
+          // Store the medical record after upload
+          if (selectedPatient) {
+            storeMedicalRecord(selectedPatient.id, {
+              id: generateUniqueId(),
+              name: selectedFile.name,
+              url: URL.createObjectURL(selectedFile),
+              tags: fileTags,
+              uploadDate: new Date().toISOString(),
+            });
+          }
+
           return 100;
         }
         return prev + 10;
@@ -125,31 +113,41 @@ const DoctorPatients: React.FC = () => {
     }, 300);
   };
 
-  const handleSaveNewPatient = () => {
+  const handleAddPatient = () => {
     if (!newPatientName || !newPatientEmail || !newPatientWallet) {
-      toast.error("Please fill in all fields.");
+      toast.error("Please fill in all fields");
       return;
     }
-    toast.success(`Patient ${newPatientName} added!`);
+
+    const newPatient: PatientType = {
+      id: Date.now().toString(),
+      name: newPatientName,
+      email: newPatientEmail,
+      wallet: newPatientWallet,
+    };
+
+    setPatients((prev) => [...prev, newPatient]);
+    toast.success("Patient added successfully");
     setShowAddPatientDialog(false);
     setNewPatientName("");
     setNewPatientEmail("");
     setNewPatientWallet("");
   };
 
+  const filteredPatients = patients.filter((patient) =>
+    `${patient.name} ${patient.email} ${patient.wallet}`.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   return (
-    <div>
-      {/* Header */}
-      <div className="flex justify-between items-center mb-6">
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">My Patients</h1>
-        <Button onClick={handleAddPatient}>
-          <Plus className="mr-2 h-4 w-4" />
-          Add Patient
+        <Button onClick={() => setShowAddPatientDialog(true)}>
+          <Plus className="mr-2 h-4 w-4" /> Add Patient
         </Button>
       </div>
 
-      {/* Search Input */}
-      <div className="flex items-center mb-6">
+      <div className="flex items-center">
         <div className="relative flex-1">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
@@ -162,7 +160,6 @@ const DoctorPatients: React.FC = () => {
         </div>
       </div>
 
-      {/* Patients Table */}
       <div className="rounded-md border">
         <Table>
           <TableHeader>
@@ -178,31 +175,17 @@ const DoctorPatients: React.FC = () => {
             {filteredPatients.length > 0 ? (
               filteredPatients.map((patient) => (
                 <TableRow key={patient.id}>
-                  <TableCell className="font-medium">{patient.name}</TableCell>
-                  <TableCell className="font-mono">
-                    {truncateWallet(patient.wallet)}
-                  </TableCell>
-                  <TableCell>
-                    {getPatientRecordCount(patient.id)}
-                  </TableCell>
+                  <TableCell>{patient.name}</TableCell>
+                  <TableCell>{truncateWallet(patient.wallet)}</TableCell>
+                  <TableCell>{getPatientRecordCount(patient.id)}</TableCell>
                   <TableCell>{getLastUploadDate(patient.id)}</TableCell>
                   <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleViewPatient(patient)}
-                      >
-                        <User className="mr-2 h-4 w-4" />
-                        Details
+                    <div className="flex gap-2 justify-end">
+                      <Button variant="outline" size="sm" onClick={() => { setSelectedPatient(patient); setShowPatientDialog(true); }}>
+                        <User className="mr-2 h-4 w-4" /> Details
                       </Button>
-                      <Button
-                        variant="default"
-                        size="sm"
-                        onClick={() => handleShowUploadDialog(patient)}
-                      >
-                        <Upload className="mr-2 h-4 w-4" />
-                        Upload
+                      <Button size="sm" onClick={() => { setSelectedPatient(patient); setShowUploadDialog(true); }}>
+                        <Upload className="mr-2 h-4 w-4" /> Upload
                       </Button>
                     </div>
                   </TableCell>
@@ -210,52 +193,77 @@ const DoctorPatients: React.FC = () => {
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={5} className="h-24 text-center">
-                  No patients found
-                </TableCell>
+                <TableCell colSpan={5} className="text-center py-10">No patients found</TableCell>
               </TableRow>
             )}
           </TableBody>
         </Table>
       </div>
 
+      {/* Upload Dialog */}
+      <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Upload Medical Record</DialogTitle>
+            <DialogDescription>
+              Upload a medical record for <strong>{selectedPatient?.name}</strong>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Input type="file" onChange={handleFileChange} />
+            <Input
+              placeholder="Tags (comma-separated)"
+              value={fileTags}
+              onChange={(e) => setFileTags(e.target.value)}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowUploadDialog(false)}>Cancel</Button>
+            <Button disabled={isUploading} onClick={handleUpload}>
+              {isUploading ? `Uploading (${uploadProgress}%)...` : "Upload"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Patient Details Dialog */}
+      <Dialog open={showPatientDialog} onOpenChange={setShowPatientDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Patient Details</DialogTitle>
+          </DialogHeader>
+          {selectedPatient ? (
+            <div className="space-y-2">
+              <p><strong>Name:</strong> {selectedPatient.name}</p>
+              <p><strong>Email:</strong> {selectedPatient.email}</p>
+              <p><strong>Wallet:</strong> {selectedPatient.wallet}</p>
+              <p><strong>Records:</strong> {getPatientRecordCount(selectedPatient.id)}</p>
+              <p><strong>Last Upload:</strong> {getLastUploadDate(selectedPatient.id)}</p>
+            </div>
+          ) : (
+            <p>No patient selected.</p>
+          )}
+          <DialogFooter>
+            <Button onClick={() => setShowPatientDialog(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Add Patient Dialog */}
       <Dialog open={showAddPatientDialog} onOpenChange={setShowAddPatientDialog}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Add New Patient</DialogTitle>
-            <DialogDescription>
-              Enter patient details below.
-            </DialogDescription>
+            <DialogDescription>Fill in the details below to add a new patient.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <Input
-              placeholder="Patient Name"
-              value={newPatientName}
-              onChange={(e) => setNewPatientName(e.target.value)}
-            />
-            <Input
-              type="email"
-              placeholder="Email"
-              value={newPatientEmail}
-              onChange={(e) => setNewPatientEmail(e.target.value)}
-            />
-            <Input
-              placeholder="Wallet Address"
-              value={newPatientWallet}
-              onChange={(e) => setNewPatientWallet(e.target.value)}
-            />
+            <Input placeholder="Patient Name" value={newPatientName} onChange={(e) => setNewPatientName(e.target.value)} />
+            <Input placeholder="Email" value={newPatientEmail} onChange={(e) => setNewPatientEmail(e.target.value)} />
+            <Input placeholder="Wallet Address" value={newPatientWallet} onChange={(e) => setNewPatientWallet(e.target.value)} />
           </div>
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowAddPatientDialog(false)}
-            >
-              Cancel
-            </Button>
-            <Button onClick={handleSaveNewPatient}>
-              <Plus className="mr-2 h-4 w-4" /> Add Patient
-            </Button>
+            <Button variant="outline" onClick={() => setShowAddPatientDialog(false)}>Cancel</Button>
+            <Button onClick={handleAddPatient}>Add Patient</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

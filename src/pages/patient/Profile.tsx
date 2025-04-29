@@ -26,6 +26,8 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import FileUpload from '@/components/FileUpload';
+import { storeMedicalRecord } from "@/lib/mockData";
+
 
 const PatientProfile: React.FC = () => {
   const { user } = useAuth();

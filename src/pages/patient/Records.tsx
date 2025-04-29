@@ -20,6 +20,7 @@ import {
 import { getUserMedicalRecords } from '@/lib/mockData';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import { storeMedicalRecord } from "@/lib/mockData";
 
 const PatientRecords: React.FC = () => {
   const { user } = useAuth();
